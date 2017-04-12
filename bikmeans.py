@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.spatial.distance import cdist
 import random
+from dotdict import dotdict
 
 #from sklearn.cluster import KMeans
 try:
@@ -13,7 +14,7 @@ X = np.array([[1, 2], [1, 4], [1, 0],
               [4, 2], [4, 4], [4, 0]])
 #kmeans = KMeans(n_clusters=2, random_state=0).fit(X)
 class KMeans:
-    def __init__(self, k = 2, delta=.001, maxiter=300, metric='cosine'):
+    def __init__(self, k = 2, delta=.001, maxiter=300, metric='euclid'):
         self.k = k
         self.delta = delta
         self.maxiter = maxiter
@@ -99,11 +100,11 @@ class KMeans:
         keys = sorted(clusters.keys())
         for k in keys:
             centroids.append(np.mean(clusters[k], axis = 0))
-        return centroids   
+        return centroids
     
     def kmeans(self, X):
-        old_centroids = self.init_random_cluster(X)
-        centroids = self.init_random_cluster(X)
+        old_centroids = random.sample(list(X), 2)
+        centroids = random.sample(list(X), 2)
         iterations = 0
         while not self.has_converged(iterations, centroids, old_centroids):
             old_centroids = centroids
@@ -111,7 +112,24 @@ class KMeans:
             centroids = self.recalculate_centroids(lc_clusters)
             iterations +=1
 
-        return (centroids, lc_clusters)
+        final_clusters = []
+        
+        for index in range(0, len(centroids)):
+            cluster = dotdict()
+            cluster.centroid = centroids[index]
+            cluster.vectors = lc_clusters[index]
+            final_clusters.append(cluster)
+
+        return final_clusters
+        
+    def similitary(self, clusters):
+        sim = 0.0
+        for cluster in clusters:
+            centroid = cluster['centroid']
+            for index in range(len(centroid)):
+                sim += centroid[index]**2
+        
+        return sim / len(clusters)
 
 class BiKMeans(KMeans):
 
@@ -129,37 +147,71 @@ class BiKMeans(KMeans):
         len2 = math.sqrt(self.dot_product(v2, v2))
         return prod / (len1 * len2)
 
-    #def find_smallest_sim_cluster(clusters):
-
-
     def execute(self, X):
         clusters = []
-        split_cluster = X
-        while (len(clusters) < k):
-            cluster = self.find_smallest_sim_cluster(clusters)
-            clusters.remove(cluster)
+        cluster = dotdict()
+        cluster.vectors = []
+        
+        for x in X:
+            cluster.vectors.append(x)
+        
+        cluster.centroid = self.calculate_centroid(cluster.vectors)
+       
+        clusters.append(cluster)
+        while (len(clusters) != self.k):
+            split_cluster = self.find_smallest_sim_cluster(clusters)
+            clusters.remove(split_cluster)
             max_cluster = float("-inf")
             max_bicluster = None
-
             for i in range(1, self.max_iter):
-                kmeans = KMeans(cluster)
-                (centroids, bi_clusters) = kmeans.kmeans(cluster)
-                sim = self.similitary(bi_clusters)
-
+                kmeans = KMeans()
+                biclusters = kmeans.kmeans(np.array(split_cluster.vectors))
+                sim = kmeans.similitary(biclusters)
                 if (sim > max_cluster):
-                    max_bicluster = bi_clusters
+                    max_bicluster = biclusters
                     max_cluster = sim
 
-            clusters.append(max_cluster)
-        self.clusters = clusters
+            clusters.extend(biclusters)
+        return clusters
+
+
+    def convert_dotdict(self, datas):
+        cluster = dotdict()
+        cluster.vectors = []
+        cluster.vectors[0] = datas[0]
+        cluster.vectors[1] = datas[1]
+        cluster.centroids = self.calculate_centroid(cluster.vectors)
+        return datas
+
+    
+    def calculate_centroid(self, clusters):
+        '''
+        centroid = []
+        for cluster in clusters:
+            print(len(cluster))
+            for index in range(0,1):
+                print(index)
+                centroid.append()
+                print(centroid[0])
+        
+        len_vectors = len(clusters)
+        for index in centroid:
+            centroid[index] = centroid[index]/len_vectors
+            '''
+        return list(np.mean(clusters, axis=0))
 
     def find_smallest_sim_cluster(self, clusters):
-        min_sim = float("-inf")
+        min_sim = float("inf")
         min_cluster = None
-
         for cluster in clusters:
+            centroid = cluster['centroid']
             sim = 0.0
-            sum_cluster = np.sum()
+            for index in range(len(centroid)):
+                sim += centroid[index]**2
+            if sim < min_sim:
+                min_sim = sim
+                min_cluster = cluster
+        return min_cluster
 
 
 means = [[2, 2], [8, 3], [3, 6]]
@@ -172,8 +224,11 @@ X2 = np.random.multivariate_normal(means[2], cov, N)
 #X = np.concatenate((X0, X1, X2), axis = 0)
 K = 3
 
-kmeans = KMeans()
-print(kmeans.kmeans(X))
+#kmeans = KMeans()
+#print(kmeans.kmeans(X))
+
+bikmeans = BiKMeans(2)
+print(bikmeans.execute(X))
 
 #tính cosine distance(2) = 1 - cosine_similitary giữa các vector
 #http://stackoverflow.com/questions/5529625/is-it-possible-to-specify-your-own-distance-function-using-scikit-learn-k-means
