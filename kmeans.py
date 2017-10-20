@@ -2,8 +2,8 @@ from sklearn.cluster import KMeans
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.spatial.distance import cdist
-X = np.array([[1, 2], [1, 4], [1, 0],
-              [4, 2], [4, 4], [4, 0]])
+X = np.array([[1, 2], [1, 4], [5, 1],
+              [4, 2], [4, 4], [4, 1], [2,3]])
 
 k = 2
 
