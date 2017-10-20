@@ -10,11 +10,11 @@ try:
 except ImportError: # will be 3.x series
   pass
 
-X = np.array([[1, 2], [1, 4], [1, 0],
-              [4, 2], [4, 4], [4, 0]])
+X = np.array([[1, 2], [1, 4], [5, 1],
+              [4, 2], [4, 4], [4, 1], [2,3]])
 #kmeans = KMeans(n_clusters=2, random_state=0).fit(X)
 class KMeans:
-    def __init__(self, k = 2, delta=.001, maxiter=300, metric='euclid'):
+    def __init__(self, k = 2, delta=.001, maxiter=300, metric='cosine'):
         self.k = k
         self.delta = delta
         self.maxiter = maxiter
@@ -33,8 +33,7 @@ class KMeans:
     '''
 
     '''
-    #machinelearning cơ bản   
-    
+    machinelearning co ban    
     def kmeans_assign_labels(self, X, centers):
         # calculate pairwise distances btw data and center by metric measure
         D = cdist(X, centers, self.metric)
@@ -71,7 +70,7 @@ class KMeans:
         return (centers, labels, it)
 
         '''
-    #kmeans với giải thuật Lloyd’s
+    #kmeans voi giai thuat Lloyd's
 
     def init_random_cluster(self, X):
     	#random choice k centroids
@@ -85,12 +84,16 @@ class KMeans:
     def assign_point_to_clusters(self, X, centroids):
         clusters = {}
         for x in X:
-            D = cdist([x], centroids, self.metric)
+            D = 1 - cdist([x], centroids, self.metric)
             index = np.argmin(D, axis=1)
             try: 
                 clusters[index[0]].append(x)
             except KeyError:
                 clusters[index[0]] = [x]
+
+        for key, cluster in clusters.items():
+            if not cluster:
+                cluster.append(X[np.random.randint(0, len(X), size=1)].flatten().tolist())
         
         return clusters
     
@@ -102,19 +105,22 @@ class KMeans:
             centroids.append(np.mean(clusters[k], axis = 0))
         return centroids
     
-    def kmeans(self, X):
-        old_centroids = random.sample(list(X), 2)
-        centroids = random.sample(list(X), 2)
+    def kmeans(self, X, k):
+        old_centroids = random.sample(list(X), k)
+        centroids = old_centroids
         iterations = 0
-        while not self.has_converged(iterations, centroids, old_centroids):
+        lc_clusters = []
+        while True:            
             old_centroids = centroids
             lc_clusters = self.assign_point_to_clusters(X = X, centroids = centroids)
             centroids = self.recalculate_centroids(lc_clusters)
             iterations +=1
+            if (self.has_converged(iterations, centroids, old_centroids)):
+                break
 
         final_clusters = []
         
-        for index in range(0, len(centroids)):
+        for index in range(len(centroids)):
             cluster = dotdict()
             cluster.centroid = centroids[index]
             cluster.vectors = lc_clusters[index]
@@ -133,7 +139,7 @@ class KMeans:
 
 class BiKMeans(KMeans):
 
-    def __init__(self, k, max_iter = 5):
+    def __init__(self, k, max_iter = 500):
         self.k = k
         self.max_iter = max_iter
         self.clusters = []
@@ -151,7 +157,6 @@ class BiKMeans(KMeans):
         clusters = []
         cluster = dotdict()
         cluster.vectors = []
-        
         for x in X:
             cluster.vectors.append(x)
         
@@ -160,15 +165,21 @@ class BiKMeans(KMeans):
         clusters.append(cluster)
         while (len(clusters) != self.k):
             split_cluster = self.find_smallest_sim_cluster(clusters)
-            clusters.remove(split_cluster)
+
+            # re-construct clusters except the split cluster
+            clusters = [d for d in clusters if not np.array_equal(d['centroid'], split_cluster['centroid'])]
+            print("clusters: ", clusters, split_cluster)
             max_cluster = float("-inf")
             max_bicluster = None
-            for i in range(1, self.max_iter):
+            for i in range(self.max_iter):
                 kmeans = KMeans()
-                biclusters = kmeans.kmeans(np.array(split_cluster.vectors))
+
+                # loop max_iter to find the best way to split
+                biclusters = kmeans.kmeans(np.array(split_cluster.vectors), 2)
                 sim = kmeans.similitary(biclusters)
                 if (sim > max_cluster):
-                    max_bicluster = biclusters
+                    print(max_cluster, sim, biclusters, len(biclusters), max_bicluster)
+                    max_bicluster = [d for d in biclusters]
                     max_cluster = sim
 
             clusters.extend(biclusters)
@@ -222,13 +233,14 @@ X1 = np.random.multivariate_normal(means[1], cov, N)
 X2 = np.random.multivariate_normal(means[2], cov, N)
 
 #X = np.concatenate((X0, X1, X2), axis = 0)
-K = 3
+# K = 3
 
-#kmeans = KMeans()
-#print(kmeans.kmeans(X))
+# Y = np.array([[1,0], [4,0]])
+# kmeans = KMeans()
+# print(kmeans.kmeans(X,k=2))
 
 bikmeans = BiKMeans(2)
 print(bikmeans.execute(X))
 
-#tính cosine distance(2) = 1 - cosine_similitary giữa các vector
+#tinh cosine distance(2) = 1 - cosine_similitary giua cac vecto
 #http://stackoverflow.com/questions/5529625/is-it-possible-to-specify-your-own-distance-function-using-scikit-learn-k-means
